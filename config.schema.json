@@ -1,0 +1,163 @@
+{
+  "pluginAlias": "SonyADCPProjector",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Control a Sony ADCP projector (VPL-XW / VW series) as a HomeKit Television. Enable **[Advanced Settings] → [ADCP] → [Start ADCP Service]** on the projector first. Choose whether the TV's inputs are picture presets or HDMI sources; the other group can appear as switches on a companion tile.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Projector",
+        "required": true,
+        "description": "Display name for the projector in HomeKit."
+      },
+      "host": {
+        "title": "IP Address",
+        "type": "string",
+        "format": "ipv4",
+        "required": true,
+        "placeholder": "192.168.1.50"
+      },
+      "port": {
+        "title": "ADCP Port",
+        "type": "integer",
+        "default": 53595,
+        "placeholder": "53595"
+      },
+      "password": {
+        "title": "ADCP Password",
+        "type": "string",
+        "description": "Only needed if [Requires Authentication] is ON for ADCP on the projector. Leave blank when authentication is off."
+      },
+      "pollInterval": {
+        "title": "Poll Interval (seconds)",
+        "type": "integer",
+        "default": 5,
+        "minimum": 2,
+        "description": "How often to read power/input/preset state back from the projector."
+      },
+      "timeout": {
+        "title": "Command Timeout (seconds)",
+        "type": "integer",
+        "default": 5,
+        "minimum": 2
+      },
+      "inputSource": {
+        "title": "TV Input List",
+        "type": "string",
+        "default": "hdmiInputs",
+        "required": true,
+        "oneOf": [
+          { "title": "HDMI sources (HDMI 1, HDMI 2, …)", "enum": ["hdmiInputs"] },
+          { "title": "Picture modes (Cinema Film 1, Game, …)", "enum": ["pictureModes"] }
+        ],
+        "description": "What the Television tile's input picker selects. Note: with 'Picture modes', if the projector is set (e.g. via the remote) to a mode you didn't list, no input is highlighted (the tile just reads 'On' — no warning); it's a harmless HomeKit limitation. 'HDMI sources' avoids it entirely; picture modes are best exposed as companion switches. See the README."
+      },
+      "companionSwitches": {
+        "title": "Companion Switches",
+        "type": "string",
+        "default": "none",
+        "required": true,
+        "oneOf": [
+          { "title": "None", "enum": ["none"] },
+          { "title": "Auto — the group not used as TV inputs", "enum": ["auto"] },
+          { "title": "Picture modes", "enum": ["pictureModes"] },
+          { "title": "HDMI inputs", "enum": ["hdmiInputs"] }
+        ],
+        "description": "Expose a group as a radio set of switches on a separate companion tile. 'Auto' shows whichever group is not the TV input list."
+      },
+      "companionName": {
+        "title": "Companion Tile Name",
+        "type": "string",
+        "placeholder": "e.g. Projector Picture Modes",
+        "description": "Optional name for the companion switch accessory. Defaults to '<Name> Picture Modes' or '<Name> Inputs'."
+      },
+      "hdmiInputs": {
+        "title": "HDMI Inputs",
+        "type": "array",
+        "description": "HDMI sources, used when 'TV Input List' is HDMI (or for HDMI companion switches). If you remove all rows, the plugin falls back to HDMI 1 + HDMI 2.",
+        "default": [
+          { "input": "hdmi1", "name": "HDMI 1" },
+          { "input": "hdmi2", "name": "HDMI 2" }
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "title": "HDMI Port",
+              "type": "string",
+              "default": "hdmi1",
+              "required": true,
+              "oneOf": [
+                { "title": "HDMI 1", "enum": ["hdmi1"] },
+                { "title": "HDMI 2", "enum": ["hdmi2"] },
+                { "title": "HDMI 3", "enum": ["hdmi3"] },
+                { "title": "HDMI 4", "enum": ["hdmi4"] }
+              ],
+              "description": "Common HDMI ports. Models with different inputs: any ADCP input value is accepted — set it in the JSON config editor."
+            },
+            "name": {
+              "title": "HomeKit Label",
+              "type": "string",
+              "placeholder": "e.g. Apple TV, PS5"
+            }
+          }
+        }
+      },
+      "pictureModes": {
+        "title": "Picture Modes",
+        "type": "array",
+        "description": "Picture modes, used when 'TV Input List' is Picture modes (or for picture-mode companion switches). If you remove all rows, the plugin falls back to a sensible default set. Availability of User slots varies by unit.",
+        "default": [
+          { "mode": "cinema_film1", "name": "Cinema Film 1" },
+          { "mode": "cinema_film2", "name": "Cinema Film 2" },
+          { "mode": "reference", "name": "Reference" },
+          { "mode": "tv", "name": "TV" },
+          { "mode": "game", "name": "Game" }
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "title": "Picture Mode",
+              "type": "string",
+              "default": "cinema_film1",
+              "required": true,
+              "oneOf": [
+                { "title": "Cinema Film 1", "enum": ["cinema_film1"] },
+                { "title": "Cinema Film 2", "enum": ["cinema_film2"] },
+                { "title": "Cinema Digital", "enum": ["cinema_digital"] },
+                { "title": "Reference", "enum": ["reference"] },
+                { "title": "TV", "enum": ["tv"] },
+                { "title": "Photo", "enum": ["photo"] },
+                { "title": "Game", "enum": ["game"] },
+                { "title": "Bright Cinema", "enum": ["brt_cinema"] },
+                { "title": "Bright TV", "enum": ["brt_tv"] },
+                { "title": "User / User 1", "enum": ["user1"] },
+                { "title": "User 2", "enum": ["user2"] },
+                { "title": "User 3 (often IMAX Enhanced)", "enum": ["user3"] },
+                { "title": "Custom…", "enum": ["custom"] }
+              ],
+              "description": "VPL-XW picture modes. Choose \"Custom…\" to enter a picture_mode value for another model."
+            },
+            "customMode": {
+              "title": "Custom Mode Value",
+              "type": "string",
+              "placeholder": "e.g. dynamic",
+              "condition": { "functionBody": "return model.pictureModes && model.pictureModes[arrayIndices] && model.pictureModes[arrayIndices].mode === 'custom';" },
+              "description": "The ADCP picture_mode value to send (used only when Picture Mode = Custom…)."
+            },
+            "name": {
+              "title": "HomeKit Label",
+              "type": "string",
+              "placeholder": "e.g. Movies, Game, IMAX Enhanced",
+              "description": "Shown in the Home app. Defaults to the mode's name. You can also rename inputs directly in the Home app."
+            }
+          }
+        }
+      }
+    }
+  }
+}

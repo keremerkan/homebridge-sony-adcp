@@ -1,0 +1,46 @@
+{
+  "name": "homebridge-sony-adcp",
+  "displayName": "Homebridge Sony ADCP",
+  "version": "1.0.0",
+  "description": "Control Sony ADCP projectors (VPL-XW / VW series) as a HomeKit Television, with picture presets exposed as selectable inputs.",
+  "author": "Kerem Erkan <kerem@ake.dev>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keremerkan/homebridge-sony-adcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/keremerkan/homebridge-sony-adcp/issues"
+  },
+  "homepage": "https://github.com/keremerkan/homebridge-sony-adcp#readme",
+  "main": "dist/index.js",
+  "engines": {
+    "node": "^18.20.4 || ^20.9.0 || ^22.0.0",
+    "homebridge": "^1.3.0 || ^2.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "sony",
+    "projector",
+    "adcp",
+    "vpl",
+    "vpl-xw5100",
+    "homekit",
+    "television"
+  ],
+  "license": "MIT",
+  "files": [
+    "dist",
+    "config.schema.json",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "homebridge": "^2.0.0-beta.0",
+    "typescript": "^5.5.0"
+  }
+}
