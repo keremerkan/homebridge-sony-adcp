@@ -2,7 +2,7 @@
   "name": "homebridge-sony-adcp",
   "displayName": "Homebridge Sony ADCP",
   "version": "1.0.0",
-  "description": "Control Sony ADCP projectors (VPL-XW / VW series) as a HomeKit Television, with picture presets exposed as selectable inputs.",
+  "description": "Control a Sony ADCP projector (VPL-XW / VW series) as a HomeKit Television — power, HDMI inputs, and picture modes over Sony's ADCP protocol.",
   "author": "Kerem Erkan <kerem@ake.dev>",
   "repository": {
     "type": "git",
