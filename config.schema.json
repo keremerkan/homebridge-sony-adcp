@@ -2,7 +2,7 @@
   "pluginAlias": "SonyADCPProjector",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Control a Sony ADCP projector (VPL-XW / VW series) as a HomeKit Television. Enable **[Advanced Settings] → [ADCP] → [Start ADCP Service]** on the projector first. Choose whether the TV's inputs are picture presets or HDMI sources; the other group can appear as switches on a companion tile.",
+  "headerDisplay": "Control a Sony ADCP projector (VPL-XW / VW series) as a HomeKit Television. Enable **[Advanced Settings] → [ADCP] → [Start ADCP Service]** on the projector first. Choose whether the TV's inputs are HDMI sources or picture modes; the other group can appear as switches on a companion tile.",
   "schema": {
     "type": "object",
     "properties": {
@@ -36,7 +36,7 @@
         "type": "integer",
         "default": 5,
         "minimum": 2,
-        "description": "How often to read power/input/preset state back from the projector."
+        "description": "How often to read power/input/mode state back from the projector."
       },
       "timeout": {
         "title": "Command Timeout (seconds)",
