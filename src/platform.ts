@@ -14,6 +14,11 @@ import {
 // ADCP error replies are `err_*` (err_cmd, err_inactive, err_option, err_val, …).
 const isErr = (reply: string): boolean => /^err/i.test(reply);
 
+// Config values are sent inside a quoted ADCP argument, so only quotes and
+// control characters (CR/LF could inject a second command line) are dangerous.
+// Anything else is left for the projector to accept or reject (model-agnostic).
+const TOKEN_RE = /^[^"\x00-\x1f\x7f]+$/;
+
 type ChannelKind = 'pictureModes' | 'hdmiInputs';
 type Role = 'input' | 'switch';
 
@@ -136,7 +141,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
 
     // Per-input show/hide, persisted by token (external accessories don't keep
     // context across restarts, so we store it ourselves next to Homebridge's data).
-    this.persistPath = join(this.api.user.storagePath(), `${PLUGIN_NAME}-${this.config.host}.json`);
+    // The host is embedded in the filename, so strip path-capable characters
+    // (keeps IPv4/hostname filenames unchanged).
+    const hostSlug = this.config.host.replace(/[^a-zA-Z0-9._-]/g, '_');
+    this.persistPath = join(this.api.user.storagePath(), `${PLUGIN_NAME}-${hostSlug}.json`);
     this.visibility = this.loadVisibility();
 
     this.api.on(APIEvent.DID_FINISH_LAUNCHING, () => {
@@ -179,6 +187,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       const selected = entry?.mode?.trim();
       const value = selected === 'custom' ? entry?.customMode?.trim() : selected;
       if (!value) continue; // skip blank rows / Custom with no value
+      if (!TOKEN_RE.test(value)) {
+        this.log.warn(`Ignoring picture mode "${value}" — quotes and control characters are not allowed.`);
+        continue;
+      }
       const known = KNOWN_MODES.find((p) => p.token === value);
       const name = (entry?.name && String(entry.name).trim()) || known?.name || value;
       out.push({ token: value, name });
@@ -192,6 +204,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     for (const entry of configured) {
       const input = entry?.input?.trim();
       if (!input) continue;
+      if (!TOKEN_RE.test(input)) {
+        this.log.warn(`Ignoring HDMI input "${input}" — quotes and control characters are not allowed.`);
+        continue;
+      }
       out.push({ input, name: (entry.name && String(entry.name).trim()) || input.toUpperCase() });
     }
     return out.length ? out : DEFAULT_HDMI_INPUTS.slice();

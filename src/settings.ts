@@ -40,14 +40,10 @@ export const MODE_ALIASES: Record<string, string> = {
   user: 'user1',
 };
 
-// Used when the user hasn't configured a `pictureModes` list.
-export const DEFAULT_MODES: ModeDef[] = [
-  { token: 'cinema_film1', name: 'Cinema Film 1' },
-  { token: 'cinema_film2', name: 'Cinema Film 2' },
-  { token: 'reference', name: 'Reference' },
-  { token: 'tv', name: 'TV' },
-  { token: 'game', name: 'Game' },
-];
+// Used when the user hasn't configured a `pictureModes` list. Derived from
+// KNOWN_MODES so the labels stay single-sourced (filter preserves its order).
+const DEFAULT_MODE_TOKENS = new Set(['cinema_film1', 'cinema_film2', 'reference', 'tv', 'game']);
+export const DEFAULT_MODES: ModeDef[] = KNOWN_MODES.filter((m) => DEFAULT_MODE_TOKENS.has(m.token));
 
 // Used when the user hasn't configured an `hdmiInputs` list. The XW5100 has two
 // HDMI ports; other models may have more (hdmi3/hdmi4) — add them in config.
