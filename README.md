@@ -16,6 +16,7 @@ On the projector, enable the ADCP service:
 2. **[Requires Authentication]** — Off is simplest. If you leave it On, the password is the projector's **web administrator password**; set it in this plugin's `password` field.
 3. Leave **[Port No.]** at `53595` unless you changed it.
 4. Optionally restrict **[Host address list]** to your Homebridge server's IP.
+5. **Give the projector a fixed IP address** (a DHCP reservation on your router, or a static IP on the projector). The plugin derives the TV accessory's HomeKit identity from `host` — if the address changes, HomeKit sees a brand-new accessory: the old tile goes "No Response", and the new one would need pairing again plus any automations rebuilt.
 
 > **Standby/power‑on note:** to turn the projector **on** from HomeKit, the projector must keep its network alive while in standby. If power‑on over IP doesn't work, check the projector's standby/network‑standby setting and enable network control in standby.
 
@@ -92,7 +93,7 @@ Which modes exist depends on the model and how its User slots are configured. No
 - **User 2** may not exist on a given unit (selecting it returns an error).
 - **IMAX Enhanced** has no dedicated ADCP command; on units where it's assigned to the **User 3** slot, select it via the `user3` value.
 
-The **Television** is published as an **external accessory** (HomeKit requires it) — it bridges through Homebridge with no separate pairing and appears as its own TV tile; you can rename/reorder/hide its inputs in the Home app, and show/hide choices persist. The **companion switch tile** is a normal **bridged** accessory, so it appears and disappears automatically when you change `inputSource`/`companionSwitches` — no manual cleanup or leftover "No Response" tiles.
+The **Television** is published as an **external accessory** (HomeKit requires it for a Television service), so it doesn't ride along with the bridge pairing — add it in the Home app once: **Add Accessory → More options…**, select the TV, and enter your Homebridge PIN. It then appears as its own TV tile; you can rename/reorder/hide its inputs in the Home app, and show/hide choices persist. The **companion switch tile** is a normal **bridged** accessory, so it appears and disappears automatically when you change `inputSource`/`companionSwitches` — no manual cleanup or leftover "No Response" tiles.
 
 ## Development
 

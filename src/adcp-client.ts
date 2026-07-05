@@ -32,7 +32,10 @@ export interface AdcpClientOptions {
  *
  * Handshake: on connect the projector sends either `NOKEY` (auth disabled) or a
  * random nonce. With a nonce we authenticate by sending the lowercase hex
- * SHA-256 of (nonce + password); a failed auth yields `err_auth`.
+ * SHA-256 of (nonce + password); the projector acknowledges a valid hash with a
+ * bare `OK` (observed on the VPL-XW5100) and only then accepts commands, so the
+ * command is sent after the ack — not pipelined behind the hash, which would
+ * make the ack read as the command's reply. A bad hash yields `err_auth`.
  */
 export class AdcpClient {
   private readonly host: string;
@@ -40,6 +43,10 @@ export class AdcpClient {
   private readonly password: string;
   private readonly timeout: number;
   private chain: Promise<unknown> = Promise.resolve();
+
+  /** What the last handshake revealed: false after a NOKEY greeting, true after
+   *  a nonce challenge, null before the first completed greeting. */
+  authRequired: boolean | null = null;
 
   constructor({ host, port = 53595, password = '', timeout = 5000 }: AdcpClientOptions) {
     this.host = host;
@@ -64,7 +71,7 @@ export class AdcpClient {
   private exec(command: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const socket = new net.Socket();
-      let phase: 'greeting' | 'reply' = 'greeting';
+      let phase: 'greeting' | 'auth' | 'reply' = 'greeting';
       let buf = '';
       let settled = false;
       let timer: NodeJS.Timeout;
@@ -90,10 +97,12 @@ export class AdcpClient {
         if (phase === 'greeting') {
           if (line === '') return;
           if (line.toUpperCase() === 'NOKEY') {
+            this.authRequired = false;
             phase = 'reply';
             write(command);
           } else {
             // Nonce challenge.
+            this.authRequired = true;
             if (!this.password) {
               finish(new AdcpError(
                 'projector requires ADCP authentication but no password is configured',
@@ -102,9 +111,19 @@ export class AdcpClient {
               return;
             }
             const hash = crypto.createHash('sha256').update(line + this.password).digest('hex');
-            phase = 'reply';
+            phase = 'auth';
             write(hash);
+          }
+          return;
+        }
+        if (phase === 'auth') {
+          if (line.toLowerCase() === 'err_auth') {
+            finish(new AdcpError('ADCP authentication failed (wrong password)', 'auth'));
+          } else if (line.toUpperCase() === 'OK') {
+            phase = 'reply';
             write(command);
+          } else {
+            finish(new AdcpError(`unexpected ADCP auth response "${line}"`, 'auth'));
           }
           return;
         }

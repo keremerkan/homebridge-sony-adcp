@@ -5,7 +5,7 @@ import {
   DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service,
 } from 'homebridge';
 
-import { AdcpClient } from './adcp-client';
+import { AdcpClient, AdcpError } from './adcp-client';
 import {
   PLUGIN_NAME, PLATFORM_NAME, KNOWN_MODES, DEFAULT_MODES, MODE_ALIASES, DEFAULT_HDMI_INPUTS,
   ModeDef, HdmiDef,
@@ -18,6 +18,18 @@ const isErr = (reply: string): boolean => /^err/i.test(reply);
 // control characters (CR/LF could inject a second command line) are dangerous.
 // Anything else is left for the projector to accept or reject (model-agnostic).
 const TOKEN_RE = /^[^"\x00-\x1f\x7f]+$/;
+
+// After a long unbroken streak of failed auth attempts (e.g. a misconfigured
+// password polling for minutes), the XW5100 keeps rejecting even a CORRECT
+// password for a short while after the failures stop (~15s observed live;
+// short or success-interleaved streaks don't trigger it). The auth error
+// message explains this so a user who just fixed their password isn't told
+// it's wrong; the "resumed" info line confirms the recovery.
+
+// Unreachability, unlike auth, is often transient (network blip, projector
+// losing power), so the warning waits for a few consecutive failed polls
+// instead of alarming on the first one.
+const UNREACHABLE_WARN_AFTER = 3;
 
 type ChannelKind = 'pictureModes' | 'hdmiInputs';
 type Role = 'input' | 'switch';
@@ -84,6 +96,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
   // Poll/transition bookkeeping (lazily set).
   private _timer?: NodeJS.Timeout;
   private _ticking = false;
+  private _authErrorLogged = false;
+  private _surplusPasswordNoted = false;
+  private _unreachableCount = 0;
+  private _unreachableWarned = false;
   private _pictureInactiveLogged = false;
   private _lastStablePower = false;
   private _prevPower?: string;
@@ -422,6 +438,22 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     this._ticking = true;
     try {
       const ps = await this.powerStatus();
+      this._unreachableCount = 0;
+      if (this._unreachableWarned) {
+        this._unreachableWarned = false;
+        this.log.info('Projector is reachable again — polling resumed.');
+      }
+      if (this._authErrorLogged) {
+        this._authErrorLogged = false;
+        this.log.info('ADCP authentication succeeded — polling resumed.');
+      }
+      // A password that the projector never asks for is a config/device
+      // mismatch worth one visible mention: it's an unused cleartext credential
+      // sitting in config.json, and warn (unlike info) stands out in the log.
+      if (this.config.password && this.client.authRequired === false && !this._surplusPasswordNoted) {
+        this._surplusPasswordNoted = true;
+        this.log.warn('The projector does not require ADCP authentication — the configured "ADCP Password" is never used and can be removed from the config.');
+      }
       this.trackPowerTiming(ps);
 
       // Power display. In a transitional state (startup/cooling) show the TARGET —
@@ -451,6 +483,24 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       await this.syncChannel(this.inputChannel, 'input', on);
       if (this.switchChannel) await this.syncChannel(this.switchChannel, 'switch', on);
     } catch (e) {
+      // Auth problems are configuration errors the user must fix (the plugin is
+      // nonfunctional until then, like a missing host), so surface them once at
+      // error level instead of the poll loop's usual debug noise. An auth reply
+      // also proves the projector is reachable, so the unreachable counter resets.
+      if (e instanceof AdcpError && e.code === 'auth') {
+        this._unreachableCount = 0;
+        this._unreachableWarned = false;
+        if (!this._authErrorLogged) {
+          this._authErrorLogged = true;
+          this.log.error(`${e.message} — check "ADCP Password" in the plugin settings against the projector's ADCP configuration. If you have just corrected the password, this is likely the projector's brute-force protection still settling after the earlier failed attempts — it clears within about 30 seconds. State updates are paused until authentication succeeds.`);
+        }
+      } else if (e instanceof AdcpError) {
+        this._unreachableCount++;
+        if (this._unreachableCount >= UNREACHABLE_WARN_AFTER && !this._unreachableWarned) {
+          this._unreachableWarned = true;
+          this.log.warn(`Projector at ${this.config.host} is not responding (${e.message}) — check the IP address and that the projector is connected to the network. Polling continues; state updates resume when it responds.`);
+        }
+      }
       this.log.debug(`poll: ${(e as Error).message}`);
     } finally {
       this._ticking = false;
@@ -506,17 +556,29 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // HomeKit -> device. Optimistic: update local state now, run protocol in background.
+  // HomeKit -> device. Optimistic: update local state now, run protocol in
+  // background. On failure the tile is reverted immediately — the poll can't be
+  // relied on to reconcile (it may be failing for the same reason, e.g. auth).
   private setPower(on: boolean): void {
+    const previous = this.state.power;
     this.state.power = on;
     this._powerCmdAt = Date.now();
     this._powerCmdTarget = on;
+    const revert = (): void => {
+      this._powerCmdAt = null;
+      this.state.power = previous;
+      this.tv.updateCharacteristic(this.Char.Active, previous ? 1 : 0);
+    };
     void (async () => {
       try {
         const r = await this.client.send(on ? 'power "on"' : 'power "off"');
-        if (isErr(r)) this.log.warn(`power ${on ? 'on' : 'off'} -> ${r}`);
+        if (isErr(r)) {
+          this.log.warn(`power ${on ? 'on' : 'off'} -> ${r}`);
+          revert();
+        }
       } catch (e) {
         this.log.warn(`power ${on ? 'on' : 'off'} failed: ${(e as Error).message}`);
+        revert();
       }
     })();
   }

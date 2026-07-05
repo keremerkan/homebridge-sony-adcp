@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-07-06
+
+### Fixed
+
+- ADCP authentication now works. The projector acknowledges a valid password hash with a bare `OK` before accepting commands; the client previously pipelined the command behind the hash and read that `OK` as the command's reply, which broke every command when [Requires Authentication] was enabled on the projector. The client now waits for the acknowledgment before sending the command. Verified live against a VPL-XW5100 with authentication both on and off.
+- A failed power command now reverts the TV tile immediately. Previously the tile kept the optimistic state (e.g. showing On after an error) and relied on the next poll to correct it — which never happens when polling is failing for the same reason.
+
+### Added
+
+- An unreachable projector (wrong IP, network problem, no power) is now surfaced once as a warning after a few consecutive failed polls, with a recovery message when it responds again. Previously unreachability was visible only in debug logs.
+- A configured password that the projector never asks for (ADCP authentication turned off) is now flagged once as a warning — it's an unused cleartext credential in the config, so the message suggests removing it.
+- Authentication problems (wrong or missing password) are now surfaced once as an error with a hint pointing at the ADCP Password setting, instead of being visible only in debug logs, and a recovery message is logged when authentication starts succeeding again. The error also explains that after repeated failed attempts (e.g. a misconfigured password polling for a while), the projector's brute-force protection keeps rejecting even a corrected password for up to ~30 seconds before settling.
+- This changelog is now included in the npm package, so the Homebridge UI can show the full version history.
+
+### Changed
+
+- README: recommend a fixed IP (DHCP reservation) for the projector — the TV accessory's HomeKit identity is derived from `host`, so an address change makes HomeKit treat it as a new accessory. Also corrected the pairing note: the Television is an external accessory and is added in the Home app once, separately from the bridge.
+
 ## [1.0.5] - 2026-07-06
 
 ### Fixed
@@ -52,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Publishes the projector's real model, serial, and firmware version to HomeKit.
 - Written in TypeScript, zero runtime dependencies, Homebridge 1.3+ / 2.x.
 
+[1.0.6]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.6
 [1.0.5]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.5
 [1.0.4]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.4
 [1.0.3]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.3
