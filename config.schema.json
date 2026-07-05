@@ -5,19 +5,18 @@
   "headerDisplay": "Control a Sony ADCP projector (VPL-XW / VW series) as a HomeKit Television. Enable **[Advanced Settings] → [ADCP] → [Start ADCP Service]** on the projector first. Choose whether the TV's inputs are HDMI sources or picture modes; the other group can appear as switches on a companion tile.",
   "schema": {
     "type": "object",
+    "required": ["name", "host", "inputSource", "companionSwitches"],
     "properties": {
       "name": {
         "title": "Name",
         "type": "string",
         "default": "Projector",
-        "required": true,
         "description": "Display name for the projector in HomeKit."
       },
       "host": {
         "title": "IP Address",
         "type": "string",
         "format": "ipv4",
-        "required": true,
         "placeholder": "192.168.1.50"
       },
       "port": {
@@ -48,7 +47,6 @@
         "title": "TV Input List",
         "type": "string",
         "default": "hdmiInputs",
-        "required": true,
         "oneOf": [
           { "title": "HDMI sources (HDMI 1, HDMI 2, …)", "enum": ["hdmiInputs"] },
           { "title": "Picture modes (Cinema Film 1, Game, …)", "enum": ["pictureModes"] }
@@ -59,7 +57,6 @@
         "title": "Companion Switches",
         "type": "string",
         "default": "none",
-        "required": true,
         "oneOf": [
           { "title": "None", "enum": ["none"] },
           { "title": "Auto — the group not used as TV inputs", "enum": ["auto"] },
@@ -84,12 +81,12 @@
         ],
         "items": {
           "type": "object",
+          "required": ["input"],
           "properties": {
             "input": {
               "title": "HDMI Port",
               "type": "string",
               "default": "hdmi1",
-              "required": true,
               "oneOf": [
                 { "title": "HDMI 1", "enum": ["hdmi1"] },
                 { "title": "HDMI 2", "enum": ["hdmi2"] },
@@ -119,12 +116,12 @@
         ],
         "items": {
           "type": "object",
+          "required": ["mode"],
           "properties": {
             "mode": {
               "title": "Picture Mode",
               "type": "string",
               "default": "cinema_film1",
-              "required": true,
               "oneOf": [
                 { "title": "Cinema Film 1", "enum": ["cinema_film1"] },
                 { "title": "Cinema Film 2", "enum": ["cinema_film2"] },
