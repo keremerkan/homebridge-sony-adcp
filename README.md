@@ -1,5 +1,7 @@
 # homebridge-sony-adcp
 
+[![verified-by-homebridge](https://img.shields.io/badge/homebridge-verified-blueviolet?color=%23491F59&style=for-the-badge&logoColor=%23FFFFFF&logo=homebridge)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
+
 A [Homebridge](https://homebridge.io) plugin that exposes a **Sony projector** (VPL‑XW / VW series) to Apple HomeKit as a **Television** accessory. You choose whether the TV's inputs are the projector's **HDMI sources** or its **picture modes**; the other group can appear as a set of switches on a companion tile.
 
 - **Power** ↔ HomeKit power (`Active`)
