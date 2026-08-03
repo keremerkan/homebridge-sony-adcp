@@ -10,6 +10,15 @@ A [Homebridge](https://homebridge.io) plugin that exposes a **Sony projector** (
 
 Control is over Sony's **ADCP** (Advanced Display Control Protocol) — a text protocol over TCP, default port `53595`. The plugin talks straight to the projector on your LAN.
 
+## Which Sony projector plugin?
+
+Sony home-cinema projectors speak one of two control protocols, and each has its own plugin:
+
+- **ADCP** — VPL‑XW series and later VW models: **this plugin**.
+- **SDCP (PJ Talk)** — the 2015‑era VPL‑VW3xx/5xx/6xx line, which does not expose ADCP: use [homebridge-sony-sdcp-v2](https://github.com/marckagan/homebridge-sony-sdcp-v2), the actively maintained, Homebridge 2‑compatible successor to the original (now unmaintained) SDCP plugin.
+
+Not sure which your model speaks? If the projector's network settings offer an **ADCP** service, it's ADCP; if only PJ Talk is listed, it's SDCP.
+
 ## Projector setup (required)
 
 On the projector, enable the ADCP service:
