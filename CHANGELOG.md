@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-08-08
+
+### Changed
+
+- Node.js 26 added to the supported engines, matching Homebridge 2.3.0's Node 26 support. Verified with a live ADCP exchange against a VPL-XW5100 on Node 26 — the plugin has no runtime dependencies, so nothing else changes.
+
 ## [1.0.6] - 2026-07-06
 
 ### Fixed
