@@ -96,6 +96,31 @@ By default you get the standard model — **HDMI sources as the TV inputs, no co
 
 **Recommendation:** the most robust setup is **HDMI sources as the TV inputs** (list all ports) with **picture modes as companion switches** (`companionSwitches: "pictureModes"`) — switches handle the off-list case gracefully (they simply go dark, no ambiguous "On"). A single-accessory setup (picture modes as the TV inputs) is fully supported too; just expose the modes you use and know that others show "On".
 
+### Matter power outlet (Alexa, Google Home, …)
+
+Matter controllers other than Apple Home don't understand the HomeKit Television, and Homebridge does **not** translate HAP accessories to Matter automatically. With `matterPower` on, the plugin additionally publishes projector **power** as a Matter **On/Off Plug-in Unit** on the bridge's Matter server:
+
+| Option | Values | Meaning |
+|---|---|---|
+| `matterPower` | `false` (default) · `true` | Publish the Matter power outlet. Requires Matter enabled on the plugin's **child bridge** (`_bridge.matter`). |
+| `matterPowerName` | string (≤ 32 bytes) | Name the outlet is published with. Defaults to `<Name> Power`. |
+
+```json
+{
+  "platform": "SonyADCPProjector",
+  "name": "Projector",
+  "host": "192.168.1.50",
+  "matterPower": true,
+  "matterPowerName": "Projector Power",
+  "_bridge": { "username": "…", "port": 51234, "matter": { "port": 5530 } }
+}
+```
+
+- **Explicit on/off.** Matter On and Off send `power "on"` / `power "off"`; Toggle is resolved into one of them from the current state. The command succeeds only once the projector accepts it — a rejection or timeout is returned to the controller as an error and the outlet's state is left unchanged. A rejected command still counts as success if the projector is already at (or heading to) the requested state.
+- **State follows the projector.** The existing poll mirrors power into Matter, so changes from the remote or Apple Home show up within one poll interval. During warm-up/cool-down the outlet shows the target state (like the TV tile). After a few consecutive failed polls, or while ADCP authentication fails, the outlet is marked unreachable.
+- **No extra connections.** The outlet shares the TV's ADCP client, authentication and poll loop.
+- **Stable identity.** Its ID is derived from `host`, like the TV's, so it survives restarts; the HomeKit TV accessory is unchanged. Turning `matterPower` off (or changing `host`) removes the outlet from Matter.
+
 ### Available picture-mode values
 
 The picture-mode field is a **dropdown** of the common VPL‑XW values plus a **"Custom…"** option — pick Custom and a text box appears for any `picture_mode` value, so the plugin works on any Sony ADCP projector. The projector is the validator — a value it doesn't support is logged and reverted at runtime, never silently wrong. (ADCP has no "list capabilities" query, so the dropdown can't be auto-discovered from the device.)
@@ -118,6 +143,7 @@ Written in TypeScript; the published package ships compiled JavaScript in `dist/
 npm install      # dev toolchain (TypeScript, types)
 npm run build    # compile src/*.ts -> dist/
 npm run watch    # recompile on change
+npm test         # build, then run the tests in test/ (fake ADCP projector over TCP)
 ```
 
 ## License

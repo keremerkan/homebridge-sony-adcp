@@ -4,8 +4,10 @@ import {
   API, APIEvent, Categories, Characteristic, CharacteristicValue,
   DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service,
 } from 'homebridge';
+import type { MatterAccessory } from 'homebridge' with { 'resolution-mode': 'import' };
 
 import { AdcpClient, AdcpError } from './adcp-client';
+import { MatterPowerOutlet } from './matter-power';
 import {
   PLUGIN_NAME, PLATFORM_NAME, KNOWN_MODES, DEFAULT_MODES, MODE_ALIASES, DEFAULT_HDMI_INPUTS,
   ModeDef, HdmiDef,
@@ -30,6 +32,14 @@ const TOKEN_RE = /^[^"\x00-\x1f\x7f]+$/;
 // losing power), so the warning waits for a few consecutive failed polls
 // instead of alarming on the first one.
 const UNREACHABLE_WARN_AFTER = 3;
+
+// Which stable state a power_status value is at or heading to (true = on), or null
+// if unknown. Sony reports e.g. startup / cooling1 / saving_standby in between.
+const powerTarget = (ps: string): boolean | null => {
+  if (ps === 'on' || ps.startsWith('startup')) return true;
+  if (ps.endsWith('standby') || ps.includes('cooling')) return false;
+  return null;
+};
 
 type ChannelKind = 'pictureModes' | 'hdmiInputs';
 type Role = 'input' | 'switch';
@@ -59,6 +69,8 @@ interface ProjectorConfig extends PlatformConfig {
   companionName?: string;
   pictureModes?: Array<{ mode?: string; customMode?: string; name?: string }>;
   hdmiInputs?: Array<{ input?: string; name?: string }>;
+  matterPower?: boolean;
+  matterPowerName?: string;
 }
 
 /**
@@ -84,6 +96,8 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
   private readonly idToToken = new Map<number, string>();
   private readonly switchServices = new Map<string, Service>();
   private readonly cachedAccessories = new Map<string, PlatformAccessory>();
+  private readonly cachedMatterAccessories = new Map<string, MatterAccessory>();
+  private matterPower: MatterPowerOutlet | null = null;
 
   private readonly state: { power: boolean; identifier: number; switchActive: string | null } =
     { power: false, identifier: 1, switchActive: null };
@@ -107,6 +121,8 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
   private _warmStart: number | null = null;
   private _powerCmdAt: number | null = null;
   private _powerCmdTarget = false;
+  private _powerInFlight = 0;
+  private _powerKnown = false;
 
   constructor(
     private readonly log: Logging,
@@ -175,6 +191,11 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
   // accessory, so Homebridge restores it here before didFinishLaunching.
   configureAccessory(accessory: PlatformAccessory): void {
     this.cachedAccessories.set(accessory.UUID, accessory);
+  }
+
+  // The Matter power outlet is restored the same way (Matter-enabled bridges only).
+  configureMatterAccessory(accessory: MatterAccessory): void {
+    this.cachedMatterAccessories.set(accessory.UUID, accessory);
   }
 
   private makeChannel(kind: ChannelKind, items: ChannelItem[]): Channel {
@@ -283,10 +304,41 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     // Companion switches are a *bridged* accessory so they can be added/removed
     // cleanly when the group changes (external accessories can't be un-published).
     this.setupCompanion();
+    this.setupMatterPower();
 
     this.refreshIdentity().catch(() => { /* best-effort */ });
     await this.tick();
     this._timer = setInterval(() => this.tick(), this.pollMs);
+  }
+
+  // Add/restore/remove the Matter power outlet. Like the companion, a cached outlet
+  // that is no longer wanted (option turned off, or host changed) is unregistered.
+  private setupMatterPower(): void {
+    const wanted = this.config.matterPower === true;
+    const matter = typeof this.api.isMatterEnabled === 'function' && this.api.isMatterEnabled()
+      ? this.api.matter
+      : undefined;
+    if (!matter) {
+      if (wanted) this.log.warn('"Expose Power to Matter" is on, but Matter is not enabled for this bridge — enable Matter on the plugin\'s child bridge to publish the power outlet.');
+      return;
+    }
+    const outlet = wanted
+      ? new MatterPowerOutlet(this.log, this.api, {
+        host: this.config.host!,
+        name: (this.config.matterPowerName && this.config.matterPowerName.trim()) || `${this.name} Power`,
+        setPower: (on) => this.setPowerFromMatter(on),
+      })
+      : null;
+
+    const stale = [...this.cachedMatterAccessories.values()].filter((a) => a.UUID !== outlet?.uuid);
+    if (stale.length) {
+      matter.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale)
+        .then(() => this.log.info(`Removed ${stale.length} stale Matter accessory(ies).`))
+        .catch((e) => this.log.warn(`could not remove stale Matter accessories: ${(e as Error).message}`));
+    }
+    if (!outlet) return;
+    this.matterPower = outlet;
+    void outlet.register().then(() => this.syncMatter());
   }
 
   // Add/restore/remove the bridged companion. Its UUID is tied to the group it
@@ -459,10 +511,12 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       // Power display. In a transitional state (startup/cooling) show the TARGET —
       // the opposite of the last stable state — so the tile doesn't flicker
       // on->off->on during the ~12s warm-up (or off->on->off during cool-down).
+      // The state's name gives the target directly (also right when the first poll
+      // after a restart lands mid-transition); unknown states fall back to the flip.
       let power: boolean;
       if (ps === 'on') power = true;
       else if (ps === 'standby') power = false;
-      else power = !this._lastStablePower;
+      else power = powerTarget(ps) ?? !this._lastStablePower;
       if (ps === 'on' || ps === 'standby') this._lastStablePower = power;
 
       // Honor a just-issued power command over a stale contradicting reading during
@@ -476,6 +530,7 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
         this.state.power = power;
         this.tv.updateCharacteristic(this.Char.Active, power ? 1 : 0);
       }
+      this._powerKnown = true;
 
       // Channels are read only when fully on (picture_mode needs that; HDMI input
       // is read regardless inside syncChannel).
@@ -504,7 +559,17 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       this.log.debug(`poll: ${(e as Error).message}`);
     } finally {
       this._ticking = false;
+      this.syncMatter();
     }
+  }
+
+  // Mirror the confirmed power state (and reachability) into Matter. Skipped while a
+  // power command is in flight: HomeKit's state is optimistic then, and a Matter
+  // command's handler commits its own result.
+  private syncMatter(): void {
+    if (!this.matterPower || this._powerInFlight > 0) return;
+    const reachable = !this._unreachableWarned && !this._authErrorLogged;
+    void this.matterPower.sync(this._powerKnown ? this.state.power : null, reachable);
   }
 
   // Read a channel's current value and reflect it into the matching HomeKit control.
@@ -569,18 +634,47 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       this.state.power = previous;
       this.tv.updateCharacteristic(this.Char.Active, previous ? 1 : 0);
     };
-    void (async () => {
-      try {
-        const r = await this.client.send(on ? 'power "on"' : 'power "off"');
-        if (isErr(r)) {
-          this.log.warn(`power ${on ? 'on' : 'off'} -> ${r}`);
-          revert();
-        }
-      } catch (e) {
+    this.sendPower(on).then(
+      () => this.syncMatter(),
+      (e) => {
         this.log.warn(`power ${on ? 'on' : 'off'} failed: ${(e as Error).message}`);
         revert();
-      }
-    })();
+      },
+    );
+  }
+
+  // Matter -> device. Not optimistic: resolves only once the projector accepted the
+  // command, so a failure reaches the controller as an error and Matter's on/off
+  // state is left unchanged. On success the HomeKit tile follows immediately.
+  private async setPowerFromMatter(on: boolean): Promise<void> {
+    try {
+      await this.sendPower(on);
+    } catch (e) {
+      this.log.warn(`Matter power ${on ? 'on' : 'off'} failed: ${(e as Error).message}`);
+      throw e;
+    }
+    this._powerCmdAt = Date.now();
+    this._powerCmdTarget = on;
+    if (this.state.power !== on) {
+      this.state.power = on;
+      this.tv.updateCharacteristic(this.Char.Active, on ? 1 : 0);
+    }
+  }
+
+  // Send an explicit power on/off (never a toggle). Resolves if the projector accepted
+  // it; an err_* reply still counts as success when the projector is already at (or
+  // heading to) the requested state, since a redundant command may be rejected.
+  private async sendPower(on: boolean): Promise<void> {
+    this._powerInFlight++;
+    try {
+      const r = await this.client.send(on ? 'power "on"' : 'power "off"');
+      if (!isErr(r)) return;
+      const ps = await this.powerStatus().catch(() => 'unknown');
+      if (powerTarget(ps) === on) return;
+      throw new Error(`projector replied ${r} (status: ${ps})`);
+    } finally {
+      this._powerInFlight--;
+    }
   }
 
   private setInput(id: number): void {
