@@ -1,10 +1,9 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import {
-  API, APIEvent, Categories, Characteristic, CharacteristicValue,
-  DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service,
-} from 'homebridge';
-import type { MatterAccessory } from 'homebridge' with { 'resolution-mode': 'import' };
+import type {
+  API, Characteristic, CharacteristicValue,
+  DynamicPlatformPlugin, Logging, MatterAccessory, PlatformAccessory, PlatformConfig, Service,
+} from 'homebridge' with { 'resolution-mode': 'import' };
 
 import { AdcpClient, AdcpError } from './adcp-client';
 import { MatterPowerOutlet } from './matter-power';
@@ -179,10 +178,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     this.persistPath = join(this.api.user.storagePath(), `${PLUGIN_NAME}-${hostSlug}.json`);
     this.visibility = this.loadVisibility();
 
-    this.api.on(APIEvent.DID_FINISH_LAUNCHING, () => {
+    this.api.on('didFinishLaunching', () => {
       this.start().catch((e) => this.log.error(`startup failed: ${e.message}`));
     });
-    this.api.on(APIEvent.SHUTDOWN, () => {
+    this.api.on('shutdown', () => {
       if (this._timer) clearInterval(this._timer);
     });
   }
@@ -256,7 +255,7 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
 
     // ===== Television accessory =====
     const tvUuid = uuid.generate(`${PLUGIN_NAME}:${this.config.host}:tv`);
-    const tvAcc = new this.api.platformAccessory(this.name, tvUuid, Categories.TELEVISION);
+    const tvAcc = new this.api.platformAccessory(this.name, tvUuid, this.api.hap.Categories.TELEVISION);
 
     this.infoService = tvAcc.getService(Svc.AccessoryInformation)!
       .setCharacteristic(Char.Manufacturer, 'Sony')
@@ -374,7 +373,7 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       || `${this.name} ${this.switchChannel.kind === 'pictureModes' ? 'Picture Modes' : 'Inputs'}`;
     let acc = this.cachedAccessories.get(desiredUuid!);
     const isNew = !acc;
-    if (!acc) acc = new this.api.platformAccessory(compName, desiredUuid!, Categories.SWITCH);
+    if (!acc) acc = new this.api.platformAccessory(compName, desiredUuid!, this.api.hap.Categories.SWITCH);
 
     this.buildCompanion(acc);
 
