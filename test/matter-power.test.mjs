@@ -108,7 +108,8 @@ function fakeMatter() {
   return m;
 }
 
-function fakeApi({ matterEnabled = true } = {}) {
+function fakeApi(apiOpts = {}) {
+  const { matterEnabled = true } = apiOpts;
   const api = new EventEmitter();
   api.hap = hap;
   api.platformAccessory = PlatformAccessory;
@@ -119,6 +120,13 @@ function fakeApi({ matterEnabled = true } = {}) {
   api.updatePlatformAccessories = () => {};
   api.unregisterPlatformAccessories = () => {};
   api.isMatterEnabled = () => matterEnabled;
+  api.serverVersion = apiOpts.serverVersion ?? '2.4.0';
+  // Same semantics as Homebridge's API.versionGreaterOrEqual for plain x.y.z.
+  api.versionGreaterOrEqual = (v) => {
+    const [a, b] = [api.serverVersion, v].map((x) => x.split('-')[0].split('.').map(Number));
+    for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+    return !api.serverVersion.includes('-');
+  };
   api.matter = matterEnabled ? fakeMatter() : undefined;
   return api;
 }
@@ -315,6 +323,30 @@ test('cached outlet is kept (re-attached) when the option stays on', async () =>
   try {
     assert.deepEqual(t.api.matter.unregistered, []);
     assert.equal(t.outletUuid, cachedUuid);
+  } finally { t.stop(); await dev.close(); }
+});
+
+test('Homebridge older than 2.3.0: warns, no outlet published or unregistered, TV unaffected', async () => {
+  const dev = await fakeProjector();
+  log.lines.length = 0;
+  const cachedUuid = hap.uuid.generate('homebridge-sony-adcp:127.0.0.1:matter-power');
+  const t = await launch(dev, {}, { serverVersion: '2.2.1' }, [{ UUID: cachedUuid, displayName: 'x' }]);
+  try {
+    assert.ok(log.lines.some(([l, m]) => l === 'warn' && /needs Homebridge 2\.3\.0 or newer \(running 2\.2\.1\)/.test(m)));
+    assert.equal(t.api.matter.registerCalls, 0);
+    assert.deepEqual(t.api.matter.unregistered, [], 'cached outlet left alone');
+    assert.ok(t.tv);
+  } finally { t.stop(); await dev.close(); }
+});
+
+test('serial number does not carry the projector IP address', async () => {
+  const dev = await fakeProjector();
+  const t = await launch(dev);
+  try {
+    const { accessory } = t.api.matter.registered.get(t.outletUuid);
+    assert.ok(!accessory.serialNumber.includes('127.0.0.1'));
+    assert.equal(accessory.serialNumber, t.outletUuid.replace(/-/g, ''));
+    assert.ok(Buffer.byteLength(accessory.serialNumber) <= 32);
   } finally { t.stop(); await dev.close(); }
 });
 

@@ -322,6 +322,13 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       if (wanted) this.log.warn('"Expose Power to Matter" is on, but Matter is not enabled for this bridge — enable Matter on the plugin\'s child bridge to publish the power outlet.');
       return;
     }
+    // Before Homebridge 2.3.0, a bridged Matter registration made while the Matter
+    // server is still starting can be dropped silently, so the outlet would be
+    // logged as published without being there. Older Homebridge keeps the TV.
+    if (!this.api.versionGreaterOrEqual('2.3.0')) {
+      if (wanted) this.log.warn(`"Expose Power to Matter" needs Homebridge 2.3.0 or newer (running ${this.api.serverVersion}) — the power outlet is not published.`);
+      return;
+    }
     const outlet = wanted
       ? new MatterPowerOutlet(this.log, this.api, {
         host: this.config.host!,

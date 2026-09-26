@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Optional Matter power outlet (`matterPower`, `matterPowerName`): projector power published as a Matter On/Off Plug-in Unit on the child bridge's Matter server, for controllers such as Alexa. Explicit on/off only, not optimistic (failures are reported to the controller), state mirrored from the existing poll, reachability reflected, stable ID derived from `host`. The HomeKit TV accessory is unchanged.
+- Optional Matter power outlet (`matterPower`, `matterPowerName`): projector power published as a Matter On/Off Plug-in Unit on the child bridge's Matter server, for controllers such as Alexa. Explicit on/off only, not optimistic (failures are reported to the controller), state mirrored from the existing poll, reachability reflected, stable ID derived from `host` (the serial number is derived from the ID, not the IP address). Needs Homebridge 2.3.0 or newer (checked at runtime; older versions get a warning and keep the TV). The HomeKit TV accessory is unchanged.
 - Tests (`npm test`) running the plugin against a fake ADCP projector.
 
 ### Changed

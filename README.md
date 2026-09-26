@@ -102,7 +102,7 @@ Matter controllers other than Apple Home don't understand the HomeKit Television
 
 | Option | Values | Meaning |
 |---|---|---|
-| `matterPower` | `false` (default) · `true` | Publish the Matter power outlet. Requires Matter enabled on the plugin's **child bridge** (`_bridge.matter`). |
+| `matterPower` | `false` (default) · `true` | Publish the Matter power outlet. Requires **Homebridge 2.3.0 or newer** and Matter enabled on the plugin's **child bridge** (`_bridge.matter`). |
 | `matterPowerName` | string (≤ 32 bytes) | Name the outlet is published with. Defaults to `<Name> Power`. |
 
 ```json
@@ -119,7 +119,8 @@ Matter controllers other than Apple Home don't understand the HomeKit Television
 - **Explicit on/off.** Matter On and Off send `power "on"` / `power "off"`; Toggle is resolved into one of them from the current state. The command succeeds only once the projector accepts it — a rejection or timeout is returned to the controller as an error and the outlet's state is left unchanged. A rejected command still counts as success if the projector is already at (or heading to) the requested state.
 - **State follows the projector.** The existing poll mirrors power into Matter, so changes from the remote or Apple Home show up within one poll interval. During warm-up/cool-down the outlet shows the target state (like the TV tile). After a few consecutive failed polls, or while ADCP authentication fails, the outlet is marked unreachable.
 - **No extra connections.** The outlet shares the TV's ADCP client, authentication and poll loop.
-- **Stable identity.** Its ID is derived from `host`, like the TV's, so it survives restarts; the HomeKit TV accessory is unchanged. Turning `matterPower` off (or changing `host`) removes the outlet from Matter.
+- **Stable identity.** Its ID is derived from `host`, like the TV's, so it survives restarts; the HomeKit TV accessory is unchanged. Turning `matterPower` off (or changing `host`) removes the outlet from Matter. Its serial number is derived from that ID, so the projector's IP address is not passed to the Matter controller.
+- **Apple Home doesn't need the Matter bridge.** Apple Home already has the TV through HomeKit; if the child bridge's Matter code is added there too, the projector shows up twice (the TV and the outlet). Pair the Matter code only with the other controllers.
 
 ### Available picture-mode values
 

@@ -46,7 +46,10 @@ export class MatterPowerOutlet {
       deviceType: matter.deviceTypes.OnOffOutlet,
       manufacturer: 'Sony',
       model: 'VPL (ADCP) Power',
-      serialNumber: `${this.opts.host}:power`,
+      // Derived from the ID, not the host: the serial number reaches the Matter
+      // controller (and e.g. Alexa's cloud), which has no use for the LAN address.
+      // Matter caps it at 32 bytes; the UUID without dashes is exactly 32.
+      serialNumber: this.uuid.replace(/-/g, ''),
       context: {},
       // Off until the first successful poll; a cache-restored endpoint keeps its last state.
       clusters: { onOff: { onOff: false } },
