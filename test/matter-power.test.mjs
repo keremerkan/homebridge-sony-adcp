@@ -25,6 +25,7 @@ function fakeProjector({ password = PASSWORD } = {}) {
     commands: [],
     reject: new Set(), // commands answered with err_inactive
     silent: false, // accept connections but never answer (timeout)
+    serial: null, // serialnum reply (null: err_cmd)
   };
   const server = net.createServer((sock) => {
     if (dev.silent) return;
@@ -56,6 +57,7 @@ function fakeProjector({ password = PASSWORD } = {}) {
     if (cmd === 'input ?') return `"${dev.input}"`;
     if (cmd === 'power "on"') { dev.power = 'startup'; return 'ok'; }
     if (cmd === 'power "off"') { dev.power = 'cooling1'; return 'ok'; }
+    if (cmd === 'serialnum ?' && dev.serial) return `"${dev.serial}"`;
     if (/^(modelname|serialnum|version) \?$/.test(cmd)) return 'err_cmd';
     return 'err_cmd';
   };
@@ -339,7 +341,26 @@ test('Homebridge older than 2.3.0: warns, no outlet published or unregistered, T
   } finally { t.stop(); await dev.close(); }
 });
 
-test('serial number does not carry the projector IP address', async () => {
+test('a new outlet gets the projector\'s serial number', async () => {
+  const dev = await fakeProjector();
+  dev.serial = '5000720';
+  const t = await launch(dev);
+  try {
+    assert.equal(t.api.matter.registered.get(t.outletUuid).accessory.serialNumber, '5000720');
+  } finally { t.stop(); await dev.close(); }
+});
+
+test('a cached outlet registers without waiting for the projector', async () => {
+  const dev = await fakeProjector();
+  dev.silent = true; // identity query would take the full timeout
+  const cachedUuid = hap.uuid.generate('homebridge-sony-adcp:127.0.0.1:matter-power');
+  const t = await launch(dev, {}, {}, [{ UUID: cachedUuid, displayName: 'Projector Power' }]);
+  try {
+    assert.equal(t.outletUuid, cachedUuid, 'registered within the start-up settle');
+  } finally { t.stop(); await dev.close(); }
+});
+
+test('serial number without a projector serial: derived from the ID, not the IP address', async () => {
   const dev = await fakeProjector();
   const t = await launch(dev);
   try {

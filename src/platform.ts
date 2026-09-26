@@ -108,6 +108,7 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
 
   // Poll/transition bookkeeping (lazily set).
   private _timer?: NodeJS.Timeout;
+  private _stopped = false;
   private _ticking = false;
   private _authErrorLogged = false;
   private _surplusPasswordNoted = false;
@@ -182,6 +183,7 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       this.start().catch((e) => this.log.error(`startup failed: ${e.message}`));
     });
     this.api.on('shutdown', () => {
+      this._stopped = true;
       if (this._timer) clearInterval(this._timer);
     });
   }
@@ -303,16 +305,16 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     // Companion switches are a *bridged* accessory so they can be added/removed
     // cleanly when the group changes (external accessories can't be un-published).
     this.setupCompanion();
-    this.setupMatterPower();
+    this.setupMatterPower(this.refreshIdentity());
 
-    this.refreshIdentity().catch(() => { /* best-effort */ });
     await this.tick();
-    this._timer = setInterval(() => this.tick(), this.pollMs);
+    // A shutdown during the first poll must not leave the poll timer running.
+    if (!this._stopped) this._timer = setInterval(() => this.tick(), this.pollMs);
   }
 
   // Add/restore/remove the Matter power outlet. Like the companion, a cached outlet
   // that is no longer wanted (option turned off, or host changed) is unregistered.
-  private setupMatterPower(): void {
+  private setupMatterPower(identity: Promise<string | null>): void {
     const wanted = this.config.matterPower === true;
     const matter = typeof this.api.isMatterEnabled === 'function' && this.api.isMatterEnabled()
       ? this.api.matter
@@ -344,7 +346,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     }
     if (!outlet) return;
     this.matterPower = outlet;
-    void outlet.register().then(() => this.syncMatter());
+    // The serial number is a fixed Matter attribute, set only when the outlet is
+    // first created: a new outlet waits for the projector's, a cached one keeps its own.
+    const serial = this.cachedMatterAccessories.has(outlet.uuid) ? Promise.resolve(null) : identity;
+    void serial.then((s) => outlet.register(s)).then(() => this.syncMatter());
   }
 
   // Add/restore/remove the bridged companion. Its UUID is tied to the group it
@@ -434,19 +439,27 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  private async refreshIdentity(): Promise<void> {
+  // Model, serial and firmware for the TV's information service. Resolves with the
+  // serial number (null if the projector did not report one) and never rejects.
+  private async refreshIdentity(): Promise<string | null> {
+    let serialNumber: string | null = null;
     try {
       const model = await this.client.send('modelname ?');
       if (model && !isErr(model)) this.infoService.updateCharacteristic(this.Char.Model, model);
       const serial = await this.client.send('serialnum ?');
-      if (serial && !isErr(serial)) this.infoService.updateCharacteristic(this.Char.SerialNumber, serial);
+      if (serial && !isErr(serial)) {
+        this.infoService.updateCharacteristic(this.Char.SerialNumber, serial);
+        serialNumber = serial;
+      }
       const version = await this.client.send('version ?');
       const fw = isErr(version) ? null : this.firmwareFromVersion(version);
       if (fw) this.infoService.updateCharacteristic(this.Char.FirmwareRevision, fw);
     } catch (e) {
       this.log.debug(`identity query failed: ${(e as Error).message}`);
     }
+    return serialNumber;
   }
+
 
   // `version ?` returns e.g. [{"main":"1.012"},{"laser":"21/00/00/00/00"}]; pull the
   // main firmware version for HomeKit's FirmwareRevision (must be numeric x.y[.z]).

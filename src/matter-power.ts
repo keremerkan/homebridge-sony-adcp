@@ -38,7 +38,8 @@ export class MatterPowerOutlet {
     this.uuid = api.hap.uuid.generate(`${PLUGIN_NAME}:${opts.host}:matter-power`);
   }
 
-  async register(): Promise<void> {
+  // `serialNumber`: the projector's, when known (only used when the outlet is created).
+  async register(serialNumber: string | null): Promise<void> {
     const matter = this.api.matter!;
     const accessory: MatterAccessory = {
       UUID: this.uuid,
@@ -46,10 +47,10 @@ export class MatterPowerOutlet {
       deviceType: matter.deviceTypes.OnOffOutlet,
       manufacturer: 'Sony',
       model: 'VPL (ADCP) Power',
-      // Derived from the ID, not the host: the serial number reaches the Matter
-      // controller (and e.g. Alexa's cloud), which has no use for the LAN address.
-      // Matter caps it at 32 bytes; the UUID without dashes is exactly 32.
-      serialNumber: this.uuid.replace(/-/g, ''),
+      // The projector's serial number; if it could not be read, one derived from the
+      // ID (never the host: it reaches the controller and e.g. Alexa's cloud). Matter
+      // caps it at 32 bytes; the UUID without dashes is exactly 32.
+      serialNumber: serialNumber && Buffer.byteLength(serialNumber, 'utf8') <= 32 ? serialNumber : this.uuid.replace(/-/g, ''),
       context: {},
       // Off until the first successful poll; a cache-restored endpoint keeps its last state.
       clusters: { onOff: { onOff: false } },
