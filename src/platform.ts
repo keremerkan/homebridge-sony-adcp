@@ -320,7 +320,10 @@ export class SonyADCPPlatform implements DynamicPlatformPlugin {
       ? this.api.matter
       : undefined;
     if (!matter) {
-      if (wanted) this.log.warn('"Expose Power to Matter" is on, but Matter is not enabled for this bridge — enable Matter on the plugin\'s child bridge to publish the power outlet.');
+      if (wanted) {
+        this.log.warn('"Expose Power to Matter" is on, but Matter is not enabled on this plugin\'s bridge, so the power outlet is not published. '
+          + 'Turn on Matter in the Homebridge UI (plugin menu → Bridge Settings), restart the bridge, then pair its Matter code with Alexa, Google Home or another Matter controller.');
+      }
       return;
     }
     // Before Homebridge 2.3.0, a bridged Matter registration made while the Matter

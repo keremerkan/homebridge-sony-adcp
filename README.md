@@ -11,6 +11,7 @@ A [Homebridge](https://homebridge.io) plugin that exposes a **Sony projector** (
 - **Power** ↔ HomeKit power (`Active`)
 - **TV inputs** ↔ HDMI sources (HDMI 1/2/…) **or** picture modes (Cinema Film 1/2, Reference, Game, …), your choice
 - **Companion switches** ↔ a radio group (mutually exclusive, reflects the active selection) for whichever group isn't the input list
+- **Optional Matter power outlet** ↔ projector power as a plain on/off plug for Alexa, Google Home and other Matter controllers (see [Matter power outlet](#matter-power-outlet-alexa-google-home-) below)
 
 Control is over Sony's **ADCP** (Advanced Display Control Protocol) — a text protocol over TCP, default port `53595`. The plugin talks straight to the projector on your LAN.
 

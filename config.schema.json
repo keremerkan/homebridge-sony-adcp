@@ -13,6 +13,20 @@
         "default": "Projector",
         "description": "Display name for the projector in HomeKit."
       },
+      "matterPower": {
+        "title": "Expose Power to Matter",
+        "type": "boolean",
+        "default": false,
+        "description": "Also publish projector power as a Matter on/off outlet (for Alexa, Google Home, SmartThings). Requires Matter to be enabled on this plugin's child bridge. The HomeKit TV accessory is unchanged."
+      },
+      "matterPowerName": {
+        "title": "Matter Power Name",
+        "type": "string",
+        "placeholder": "e.g. Projector Power",
+        "maxLength": 32,
+        "condition": { "functionBody": "return model.matterPower === true;" },
+        "description": "Name the Matter outlet is published with (max 32 bytes). Defaults to '<Name> Power'. It can also be renamed in the controller's app."
+      },
       "host": {
         "title": "IP Address",
         "type": "string",
@@ -64,20 +78,6 @@
           { "title": "HDMI inputs", "enum": ["hdmiInputs"] }
         ],
         "description": "Expose a group as a radio set of switches on a separate companion tile. 'Auto' shows whichever group is not the TV input list."
-      },
-      "matterPower": {
-        "title": "Expose Power to Matter",
-        "type": "boolean",
-        "default": false,
-        "description": "Also publish projector power as a Matter on/off outlet (for Alexa, Google Home, SmartThings). Requires Matter to be enabled on this plugin's child bridge. The HomeKit TV accessory is unchanged."
-      },
-      "matterPowerName": {
-        "title": "Matter Power Name",
-        "type": "string",
-        "placeholder": "e.g. Projector Power",
-        "maxLength": 32,
-        "condition": { "functionBody": "return model.matterPower === true;" },
-        "description": "Name the Matter outlet is published with (max 32 bytes). Defaults to '<Name> Power'. It can also be renamed in the controller's app."
       },
       "companionName": {
         "title": "Companion Tile Name",

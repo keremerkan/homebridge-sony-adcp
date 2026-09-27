@@ -5,12 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-09-27
 
 ### Added
 
 - Optional Matter power outlet (`matterPower`, `matterPowerName`): projector power published as a Matter On/Off Plug-in Unit on the child bridge's Matter server, for controllers such as Alexa. Explicit on/off only, not optimistic (failures are reported to the controller), state mirrored from the existing poll, reachability reflected, stable ID derived from `host` (its serial number is the projector's, read when the outlet is first created, or one derived from the ID if the projector does not answer; never the IP address). Needs Homebridge 2.3.0 or newer (checked at runtime; older versions get a warning and keep the TV). The HomeKit TV accessory is unchanged.
 - Tests (`npm test`) running the plugin against a fake ADCP projector.
+- `supports-hap` and `supports-matter` package keywords, so the Homebridge UI shows the plugin as supporting both and offers Matter for its child bridge.
 
 ### Changed
 
@@ -87,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Publishes the projector's real model, serial, and firmware version to HomeKit.
 - Written in TypeScript, zero runtime dependencies, Homebridge 1.3+ / 2.x.
 
+[1.1.0]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.1.0
+[1.0.7]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.7
 [1.0.6]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.6
 [1.0.5]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.5
 [1.0.4]: https://github.com/keremerkan/homebridge-sony-adcp/releases/tag/v1.0.4
